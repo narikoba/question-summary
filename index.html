@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>質問要旨 自動生成システム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Noto+Sans+JP:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1814;
+    --ink-light: #4a4640;
+    --ink-muted: #8a8480;
+    --paper: #f7f4ef;
+    --paper-warm: #efeae2;
+    --paper-card: #faf8f5;
+    --accent: #8b3a2a;
+    --accent-light: #c4614e;
+    --accent-pale: #f0e0db;
+    --border: #d8d0c4;
+    --border-light: #ece6de;
+    --success: #2e6b4a;
+    --shadow-sm: 0 1px 3px rgba(26,24,20,0.06), 0 1px 2px rgba(26,24,20,0.04);
+    --shadow-md: 0 4px 12px rgba(26,24,20,0.08), 0 2px 6px rgba(26,24,20,0.05);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; line-height: 1.7; }
+
+  header {
+    background: var(--ink); padding: 0 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(26,24,20,0.18);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-crest { width: 28px; height: 28px; border: 1.5px solid var(--accent-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .header-crest svg { width: 14px; height: 14px; fill: var(--accent-light); }
+  .header-title { font-family: 'Noto Serif JP', serif; font-size: 14px; font-weight: 400; color: #e8e2d8; letter-spacing: 0.12em; }
+  .header-sub { font-size: 10px; color: var(--ink-muted); letter-spacing: 0.08em; margin-top: 1px; }
+  .header-badge { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent-light); border: 1px solid rgba(139,58,42,0.4); padding: 3px 8px; border-radius: 2px; letter-spacing: 0.06em; }
+
+  .workspace { max-width: 1280px; margin: 0 auto; padding: 36px 40px 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+
+  .panel { background: var(--paper-card); border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow-md); overflow: hidden; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border-light); background: var(--paper-warm); }
+  .panel-title-wrap { display: flex; align-items: center; gap: 10px; }
+  .panel-number { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); font-weight: 500; letter-spacing: 0.04em; }
+  .panel-title { font-family: 'Noto Serif JP', serif; font-size: 13px; font-weight: 600; color: var(--ink); letter-spacing: 0.06em; }
+  .panel-body { padding: 20px; }
+
+  /* TABS */
+  .input-tabs { display: flex; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .tab-btn { flex: 1; padding: 9px 12px; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; background: var(--paper-warm); color: var(--ink-muted); border: none; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .tab-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .tab-btn.active { background: var(--ink); color: #f0ebe3; }
+  .tab-btn:not(.active):hover { background: var(--paper); color: var(--ink); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .input-label { font-size: 11px; color: var(--ink-muted); letter-spacing: 0.08em; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .input-label::before { content: ''; display: inline-block; width: 3px; height: 10px; background: var(--accent); border-radius: 1px; }
+  textarea { width: 100%; min-height: 360px; padding: 16px; font-family: 'Noto Sans JP', sans-serif; font-size: 13px; line-height: 1.8; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 3px; resize: vertical; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+  textarea:focus { border-color: var(--accent-light); box-shadow: 0 0 0 3px rgba(196,97,78,0.08); }
+  textarea::placeholder { color: #c0bbb4; font-size: 12px; }
+
+  /* DROP ZONE */
+  .drop-zone { border: 2px dashed var(--border); border-radius: 4px; min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px 24px; cursor: pointer; transition: all 0.2s; background: #fff; }
+  .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent-light); background: var(--accent-pale); }
+  .drop-zone.has-file { border-style: solid; border-color: var(--success); background: #f0f7f4; }
+  .drop-icon { width: 52px; height: 52px; border-radius: 50%; background: var(--paper-warm); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: all 0.2s; }
+  .drop-zone.has-file .drop-icon { background: #e0f0ea; border-color: rgba(46,107,74,0.3); }
+  .drop-main { font-size: 13px; font-weight: 500; color: var(--ink); text-align: center; }
+  .drop-sub { font-size: 11px; color: var(--ink-muted); text-align: center; line-height: 1.7; }
+  .drop-btn { padding: 7px 18px; font-size: 12px; font-family: 'Noto Sans JP', sans-serif; background: var(--ink); color: #f0ebe3; border: none; border-radius: 2px; cursor: pointer; transition: background 0.15s; letter-spacing: 0.06em; }
+  .drop-btn:hover { background: #2e2a26; }
+  #pdfFileInput { display: none; }
+
+  .pdf-badge { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: #e0f0ea; border: 1px solid rgba(46,107,74,0.2); border-radius: 3px; margin-top: 12px; }
+  .pdf-badge.visible { display: flex; }
+  .pdf-badge-icon { font-size: 18px; flex-shrink: 0; }
+  .pdf-badge-info { flex: 1; min-width: 0; }
+  .pdf-badge-name { font-size: 12px; color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pdf-badge-size { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-muted); }
+  .pdf-remove { background: none; border: none; cursor: pointer; color: var(--ink-muted); font-size: 14px; padding: 2px 4px; border-radius: 2px; transition: color 0.15s; flex-shrink: 0; }
+  .pdf-remove:hover { color: var(--accent); }
+
+  .btn-generate { width: 100%; padding: 14px 24px; margin-top: 16px; background: var(--ink); color: #f0ebe3; font-family: 'Noto Serif JP', serif; font-size: 14px; font-weight: 600; letter-spacing: 0.14em; border: none; border-radius: 3px; cursor: pointer; position: relative; overflow: hidden; transition: background 0.2s, transform 0.1s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .btn-generate::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+  .btn-generate:hover:not(:disabled) { background: #2e2a26; }
+  .btn-generate:active:not(:disabled) { transform: scale(0.995); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(240,235,227,0.3); border-top-color: #f0ebe3; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .output-placeholder { min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 40px 20px; }
+  .output-placeholder-icon { width: 40px; height: 40px; border: 1.5px dashed var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--border); font-size: 18px; }
+  .output-placeholder p { font-size: 12px; color: var(--ink-muted); letter-spacing: 0.06em; line-height: 1.6; }
+  .output-result { display: none; }
+  .output-result.visible { display: block; }
+  .result-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .result-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--success); font-weight: 500; }
+  .result-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .result-actions { display: flex; gap: 8px; }
+  .btn-action { padding: 5px 12px; font-size: 11px; font-family: 'Noto Sans JP', sans-serif; border-radius: 2px; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px; }
+  .btn-copy { background: var(--ink); color: #f0ebe3; border: 1px solid var(--ink); }
+  .btn-copy:hover { background: #2e2a26; }
+  .btn-copy.copied { background: var(--success); border-color: var(--success); }
+  .btn-clear { background: none; color: var(--ink-muted); border: 1px solid var(--border); }
+  .btn-clear:hover { border-color: var(--ink-muted); color: var(--ink); }
+  .result-box { background: #fff; border: 1px solid var(--border); border-radius: 3px; padding: 20px; white-space: pre-wrap; font-family: 'Noto Serif JP', serif; font-size: 13.5px; line-height: 2; color: var(--ink); min-height: 200px; word-break: break-all; }
+
+  .error-box { display: none; padding: 14px 16px; background: #fff0ee; border: 1px solid rgba(139,58,42,0.25); border-radius: 3px; margin-top: 12px; }
+  .error-box.visible { display: block; }
+  .error-box p { font-size: 12px; color: var(--accent); line-height: 1.6; }
+  .error-title { font-weight: 500; margin-bottom: 4px; }
+
+  .info-card { grid-column: 1 / -1; display: flex; gap: 20px; background: var(--paper-warm); border: 1px solid var(--border-light); border-radius: 4px; padding: 16px 20px; box-shadow: var(--shadow-sm); }
+  .info-item { display: flex; align-items: flex-start; gap: 10px; flex: 1; }
+  .info-item-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .info-item-text strong { display: block; font-size: 11px; font-weight: 500; color: var(--ink); letter-spacing: 0.06em; margin-bottom: 2px; }
+  .info-item-text span { font-size: 11px; color: var(--ink-muted); line-height: 1.5; }
+  .info-divider { width: 1px; background: var(--border-light); flex-shrink: 0; }
+
+  .streaming-cursor { display: inline-block; width: 2px; height: 1em; background: var(--accent); margin-left: 2px; animation: blink 0.8s step-end infinite; vertical-align: text-bottom; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  @media (max-width: 860px) {
+    .workspace { grid-template-columns: 1fr; padding: 20px; }
+    .info-card { flex-direction: column; grid-column: 1; }
+    .info-divider { width: 100%; height: 1px; }
+    header { padding: 0 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-crest">
+      <svg viewBox="0 0 16 16"><path d="M8 1L10 6H15L11 9.5L12.5 15L8 12L3.5 15L5 9.5L1 6H6Z"/></svg>
+    </div>
+    <div>
+      <div class="header-title">質問要旨　自動生成システム</div>
+      <div class="header-sub">Tokyo Metropolitan Assembly · Document Question Summary Generator</div>
+    </div>
+  </div>
+  <div class="header-badge">Claude API</div>
+</header>
+
+<div class="workspace">
+
+  <div class="info-card">
+    <div class="info-item">
+      <span class="info-item-icon">✏️</span>
+      <div class="info-item-text"><strong>テキスト入力</strong><span>文書質問を直接貼り付け</span></div>
+    </div>
+    <div class="info-divider"></div>
+    <div class="info-item">
+      <span class="info-item-icon">📄</span>
+      <div class="info-item-text"><strong>PDF対応</strong><span>D&D またはクリックで読み込み</span></div>
+    </div>
+    <div class="info-divider"></div>
+    <div class="info-item">
+      <span class="info-item-icon">⚡</span>
+      <div class="info-item-text"><strong>自動構造化</strong><span>Claude AIが要旨ルールに従い出力</span></div>
+    </div>
+    <div class="info-divider"></div>
+    <div class="info-item">
+      <span class="info-item-icon">🔒</span>
+      <div class="info-item-text"><strong>セキュア</strong><span>APIキーはサーバー側のみに保管</span></div>
+    </div>
+  </div>
+
+  <!-- INPUT PANEL -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap">
+        <span class="panel-number">STEP 01</span>
+        <span class="panel-title">文書質問の入力</span>
+      </div>
+    </div>
+    <div class="panel-body">
+
+      <!-- TABS -->
+      <div class="input-tabs">
+        <button class="tab-btn" id="tabText" onclick="switchTab('text')">✏️ テキスト入力</button>
+        <button class="tab-btn active" id="tabPdf" onclick="switchTab('pdf')">📄 PDF アップロード</button>
+      </div>
+
+      <!-- TEXT TAB -->
+      <div class="tab-content" id="contentText">
+        <div class="input-label">文書質問のテキスト</div>
+        <textarea id="inputText" placeholder="議員の文書質問のテキストをここに貼り付けてください。&#10;&#10;例：&#10;　東京都では大口径下水道管について緊急点検をしていると聞いているが、都の下水道管路延長のうち、800mm～1350mmと2000mm以上は、どれくらいの割合かお示しください。&#10;&#10;　また、既存の空き家をリノベーションする方が廉価に住宅を準備できると考えるが、所見をお示しください。"></textarea>
+      </div>
+
+      <!-- PDF TAB -->
+      <div class="tab-content active" id="contentPdf">
+        <div
+          class="drop-zone" id="dropZone"
+          onclick="document.getElementById('pdfFileInput').click()"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event)"
+        >
+          <div class="drop-icon" id="dropIcon">📄</div>
+          <div class="drop-main" id="dropMain">PDFをここにドラッグ＆ドロップ</div>
+          <div class="drop-sub" id="dropSub">または下のボタンからファイルを選択<br>（文書質問が記載されたPDFファイル）</div>
+          <button class="drop-btn" onclick="event.stopPropagation(); document.getElementById('pdfFileInput').click()">ファイルを選択</button>
+        </div>
+        <input type="file" id="pdfFileInput" accept=".pdf,application/pdf" onchange="handleFileSelect(event)">
+
+        <div class="pdf-badge" id="pdfBadge">
+          <span class="pdf-badge-icon">✅</span>
+          <div class="pdf-badge-info">
+            <div class="pdf-badge-name" id="pdfBadgeName"></div>
+            <div class="pdf-badge-size" id="pdfBadgeSize"></div>
+          </div>
+          <button class="pdf-remove" onclick="removePdf()">✕</button>
+        </div>
+      </div>
+
+      <button class="btn-generate" id="generateBtn" onclick="generate()">
+        <span id="btnIcon">✦</span>
+        <span id="btnText">質問要旨を生成する</span>
+      </button>
+
+      <div class="error-box" id="errorBox">
+        <div class="error-title">⚠ エラー</div>
+        <p id="errorMsg"></p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- OUTPUT PANEL -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap">
+        <span class="panel-number">STEP 02</span>
+        <span class="panel-title">生成された質問要旨</span>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div id="outputPlaceholder" class="output-placeholder">
+        <div class="output-placeholder-icon">✦</div>
+        <p>左側にテキストまたはPDFを入力し<br>「質問要旨を生成する」を押すと<br>ここに結果が表示されます</p>
+      </div>
+      <div id="outputResult" class="output-result">
+        <div class="result-meta">
+          <div class="result-status" id="resultStatus">
+            <div class="result-status-dot"></div><span>生成完了</span>
+          </div>
+          <div class="result-actions">
+            <button class="btn-action btn-clear" onclick="clearOutput()">クリア</button>
+            <button class="btn-action btn-copy" id="copyBtn" onclick="copyResult()">
+              <span id="copyIcon">⎘</span><span id="copyText">コピー</span>
+            </button>
+          </div>
+        </div>
+        <div class="result-box" id="resultBox"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const PROMPT_TEXT = `#### **# あなたの役割**
+都議会のプロセスを熟知し、議員の質問の意図を的確に汲み取りながら、行政側が論点を明確に把握できる、構造化された文書を作成する専門家。
+
+#### **# 実行プロセス**
+1.  ユーザーが、議員の文書質問のテキストデータを入力します。
+2.  あなたは提供されたテキストデータを分析し、下記の「質問要旨の作成ルール」に完全に従って、質問要旨をマークダウン形式で生成・出力します。
+
+#### **# 質問要旨の作成ルール**
+
+**1. 原文の尊重:**
+   *   議員の質問の意図を最大限に生かすため、原文を可能な限りそのまま抽出・使用します。
+   *   原文にある誤字は、修正せずにそのまま記載してください。
+
+**2. 抽出の基本ルール:**
+   *   質問の核心部分である、文末が「～伺います。」「～伺う。」「～お示しください。」といった質問調の一文を特定します。
+   *   原則として、その質問調の一文、もしくはその一文と、その直前の文章をセットで抽出します。
+
+**3. 指示語の取り扱い:**
+   *   抽出対象の文章に「それ」「これ」「これら」「そうした」などの指示語が含まれる場合、文脈が不明確にならないよう、通常よりも前の文を長く引用します。
+   *   場合によっては、指示語が指す内容を明らかにするため、前の前の文章、さらにはそれ以前の文章まで含めて引用することを許可します。
+
+**4. 文体の統一【絶対厳守】:**
+   *   抽出した文章は、すべて「～である。」「～か。」といった「である体」に統一してください。
+   *   「いかがか伺う」「いかがですか」などの表現は、「見解を伺う」に統一してください。
+   *   「示してください」「お示しください」などの表現は、「伺う」に統一してください（例：「方針を示してください」→「方針を伺う」）。「示すことを伺う」という表現は使用しないでください。
+   *   要旨の各項目の最終的な文末は、必ず「伺う。」または「見解を伺う。」としてください。
+   *   **数字の表記:** 本文中の数字について、一桁の場合は全角（例：２、５）、二桁以上の場合は半角（例：10、330）に統一してください。
+
+**5. 階層構造とインデント【絶対厳守】:**
+   *   質問要旨の構造は、以下の階層を厳格に守ってください。
+      *   **第一階層:** \`一、二、三…\` （全角数字）
+      *   **第二階層:** \`　１、２、３…\` （全角数字）
+      *   **第三階層:** \`　　ア、イ、ウ…\` （全角カタカナ）
+      *   **第四階層:** \`　　　a, b, c…\` （半角英字）
+   *   **【重要】第二階層の特例:** 第一階層の項目の下に、第二階層の項目が1つしか存在しない場合は、番号（１）を振らずに、全角スペースでのインデントのみで記述してください。
+       *   （例）
+           一　大江戸線について
+           　大江戸線の延伸について伺う。
+   *   下の階層に行くごとに、必ず一文字分のインデント（字下げ）を入れてください。
+   *   第一階層（一、二…）のセクション間には、読みやすさ向上のため、必ず改行を1行入れてください。見出しとその直下の項目の間には改行を入れません。
+
+**6. 出力形式:**
+   *   最終的なアウトプットは、Microsoft Wordに直接コピー＆ペーストして体裁が崩れない、プレーンなテキストに近いマークダウン形式とします。
+   *   出力は質問要旨の本文のみとし、前置きや説明文は一切含めないでください。
+
+---
+
+#### **# 出力例：サンプル１**
+
+一　石神井川、善福寺川の上流地下調節池について
+　１　2012年11月作成の「中小河川における都の整備方針」をもとに、石神井川は2016年３月作成の石神井川河川整備計画、善福寺川は2023年３月作成の神田川流域河川整備計画に基づいて整備されているとの理解でよいか伺う。
+　２　両河川の整備事業の有効性を評価する上で、具体的には上流地下調節池整備事業の実施の是非を判断する上で重要となる費用便益分析について
+　　ア　石神井川については上流地下調節池整備事業の費用便益分析が行われているが、河川整備計画にある河道整備及び調節池計画全体の費用便益分析は示されていない一方、善福寺川については上流地下調節池単体の費用便益分析は示されていないが、神田川流域河川整備計画にある河道整備と調節池計画全体をまとめた費用便益分析が示されている。このように両河川で扱いが異なるのは何故か伺う。
+　　イ　本来、事業効果を知るために必要な費用便益分析は、独立した事業ごとに行われるべきであり、諸事業は単体としても費用便益比が１を超えていることで効果が示され、全体としても費用便益が１を超えることで効果が示されるべきと思うが、見解を伺う。
+　　ウ　その上で、石神井川については河川整備計画にある事業全体の費用便益分析を、また善福寺川については上流地下調節池の費用便益分析を伺う。
+　３　石神井川においても、善福寺川においても、上流地下調節池の費用便益比が1.0を下回った場合、国の補助金獲得が困難になると思われる。また、費用が効果を上回る事業ということになるので、事業の根本的な見直しが必要になると思うが、その理解でよいか伺う。
+
+#### **# 出力例：サンプル２**
+
+一　下水道管による陥没事故防止について
+　１　東京都では大口径(2000mm以上）下水道管について緊急点検をしていると聞いているが、都の下水道管路延長のうち、800ｍｍ～1350ｍｍと2000ｍｍ以上は、どれくらいの割合か伺う。
+　２　下水道管渠再構築工事で流路が変更され、主要な流路ではなくなり、ほぼ廃用の管路は管渠更生などの対象から外されていないか、再構築を何らかの理由で取りやめた箇所では陥没が発生するのではないか懸念している。800ｍｍ～1350ｍｍ管路をどう把握し対策を講じているのか、どのように維持補修する予定かも含めて伺う。
+
+二　アフォーダブル住宅について
+　１　東京都の推進するアフォーダブル住宅は、大手ハウスメーカーとの資本と東京都の資本を使って、新たにマンションを建築するということなのか、そもそも住宅困難者救済のファクターはあるのか、同事業の詳細について伺う。
+　２　既存の空き家をリノベーションする方が、廉価に住宅を準備でき、大規模な工事も必要とせずゼロエミッション東京の理念に則し、現実的と考える｡都内に約90万戸あるといわれる「空き家」の活用、空き家問題解消に同事業は寄与するのか、所見を伺う。
+
+# 分析対象の文書
+`;
+
+const PROMPT_PDF = `#### **# あなたの役割**
+都議会のプロセスを熟知し、議員の質問の意図を的確に汲み取りながら、行政側が論点を明確に把握できる、構造化された文書を作成する専門家。
+
+#### **# 実行プロセス**
+添付されたPDFファイルには議員の文書質問が記載されています。このPDFを読み取り、下記の「質問要旨の作成ルール」に完全に従って、質問要旨をマークダウン形式で生成・出力してください。
+
+#### **# 質問要旨の作成ルール**
+
+**1. 原文の尊重:**
+   *   議員の質問の意図を最大限に生かすため、原文を可能な限りそのまま抽出・使用します。
+   *   原文にある誤字は、修正せずにそのまま記載してください。
+
+**2. 抽出の基本ルール:**
+   *   質問の核心部分である、文末が「～伺います。」「～伺う。」「～お示しください。」といった質問調の一文を特定します。
+   *   原則として、その質問調の一文、もしくはその一文と、その直前の文章をセットで抽出します。
+
+**3. 指示語の取り扱い:**
+   *   抽出対象の文章に「それ」「これ」「これら」「そうした」などの指示語が含まれる場合、文脈が不明確にならないよう、通常よりも前の文を長く引用します。
+
+**4. 文体の統一【絶対厳守】:**
+   *   「いかがですか」→「見解を伺う」、「お示しください」→「伺う」に統一。
+   *   文末は必ず「伺う。」または「見解を伺う。」とする。
+   *   一桁数字は全角、二桁以上は半角。
+
+**5. 階層構造とインデント【絶対厳守】:**
+   *   第一階層：一、二、三… ／ 第二階層：　１、２、３… ／ 第三階層：　　ア、イ、ウ… ／ 第四階層：　　　a, b, c…
+   *   第一階層の下に第二階層が１つだけの場合は番号を振らずインデントのみ。
+   *   セクション間（一→二など）には空行を１行入れる。
+
+**6. 出力形式:**
+   *   Word貼り付け対応のプレーンテキストに近いマークダウン形式。
+   *   前置きや説明文は一切含めず、質問要旨の本文のみ出力する。`;
+
+// ── STATE ──
+let isGenerating = false;
+let currentResult = '';
+let currentTab = 'pdf';
+let pdfBase64 = null;
+
+// ── TABS ──
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabText').classList.toggle('active', tab === 'text');
+  document.getElementById('tabPdf').classList.toggle('active', tab === 'pdf');
+  document.getElementById('contentText').classList.toggle('active', tab === 'text');
+  document.getElementById('contentPdf').classList.toggle('active', tab === 'pdf');
+}
+
+// ── PDF ──
+function handleDragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('dragging'); }
+function handleDragLeave(e) { document.getElementById('dropZone').classList.remove('dragging'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file) loadPdfFile(file);
+}
+function handleFileSelect(e) { const f = e.target.files[0]; if (f) loadPdfFile(f); }
+
+function loadPdfFile(file) {
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { showError('PDFファイルのみアップロードできます。'); return; }
+  if (file.size > 32 * 1024 * 1024) { showError('ファイルサイズが大きすぎます（最大32MB）。'); return; }
+  hideError();
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    pdfBase64 = e.target.result.split(',')[1];
+    document.getElementById('dropZone').classList.add('has-file');
+    document.getElementById('dropIcon').textContent = '✅';
+    document.getElementById('dropMain').textContent = 'PDFを読み込みました';
+    document.getElementById('dropSub').textContent = '別のファイルを選択する場合はクリックまたはD&D';
+    document.getElementById('pdfBadge').classList.add('visible');
+    document.getElementById('pdfBadgeName').textContent = file.name;
+    document.getElementById('pdfBadgeSize').textContent = formatFileSize(file.size);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePdf() {
+  pdfBase64 = null;
+  document.getElementById('pdfFileInput').value = '';
+  document.getElementById('dropZone').classList.remove('has-file');
+  document.getElementById('dropIcon').textContent = '📄';
+  document.getElementById('dropMain').textContent = 'PDFをここにドラッグ＆ドロップ';
+  document.getElementById('dropSub').textContent = 'または下のボタンからファイルを選択\n（文書質問が記載されたPDFファイル）';
+  document.getElementById('pdfBadge').classList.remove('visible');
+}
+
+function formatFileSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/(1024*1024)).toFixed(1) + ' MB';
+}
+
+// ── UI ──
+function showError(m) { document.getElementById('errorMsg').textContent = m; document.getElementById('errorBox').classList.add('visible'); }
+function hideError() { document.getElementById('errorBox').classList.remove('visible'); }
+function setLoading(v) {
+  isGenerating = v;
+  document.getElementById('generateBtn').disabled = v;
+  document.getElementById('btnIcon').innerHTML = v ? '<div class="spinner"></div>' : '✦';
+  document.getElementById('btnText').textContent = v ? '生成中...' : '質問要旨を生成する';
+}
+function clearOutput() {
+  document.getElementById('outputPlaceholder').style.display = 'flex';
+  document.getElementById('outputResult').classList.remove('visible');
+  currentResult = '';
+}
+async function copyResult() {
+  if (!currentResult) return;
+  try { await navigator.clipboard.writeText(currentResult); }
+  catch(e) { const t=document.createElement('textarea'); t.value=currentResult; t.style.cssText='position:fixed;opacity:0'; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); }
+  const btn = document.getElementById('copyBtn');
+  btn.classList.add('copied');
+  document.getElementById('copyIcon').textContent = '✓';
+  document.getElementById('copyText').textContent = 'コピー完了';
+  setTimeout(() => { btn.classList.remove('copied'); document.getElementById('copyIcon').textContent='⎘'; document.getElementById('copyText').textContent='コピー'; }, 2000);
+}
+
+// ── GENERATE ──
+async function generate() {
+  if (isGenerating) return;
+  hideError();
+
+  let body;
+  if (currentTab === 'text') {
+    const txt = document.getElementById('inputText').value.trim();
+    if (!txt) { showError('文書質問のテキストを入力してください。'); return; }
+    body = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      stream: true,
+      messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT_TEXT + txt }] }]
+    };
+  } else {
+    if (!pdfBase64) { showError('PDFファイルをアップロードしてください。'); return; }
+    body = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      stream: true,
+      messages: [{ role: 'user', content: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+        { type: 'text', text: PROMPT_PDF }
+      ]}]
+    };
+  }
+
+  setLoading(true);
+  document.getElementById('outputPlaceholder').style.display = 'none';
+  const outputResult = document.getElementById('outputResult');
+  outputResult.classList.add('visible');
+  const resultBox = document.getElementById('resultBox');
+  const resultStatus = document.getElementById('resultStatus');
+  resultStatus.innerHTML = '<div class="result-status-dot" style="background:#c4614e;animation:blink 1s infinite"></div><span>生成中...</span>';
+  resultBox.textContent = '';
+  currentResult = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'streaming-cursor';
+  resultBox.appendChild(cursor);
+
+  try {
+    // ← サーバーレス関数（/api/generate）を呼ぶ。APIキーはサーバー側で処理
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      let msg = `エラー (${response.status})`;
+      try { const d = await response.json(); if (d.error) msg += `：${d.error}`; } catch(e) {}
+      throw new Error(msg);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const p = JSON.parse(data);
+          if (p.type === 'content_block_delta' && p.delta?.type === 'text_delta') {
+            currentResult += p.delta.text;
+            resultBox.textContent = currentResult;
+            resultBox.appendChild(cursor);
+            resultBox.scrollTop = resultBox.scrollHeight;
+          }
+        } catch(e) {}
+      }
+    }
+    resultBox.textContent = currentResult;
+    resultStatus.innerHTML = '<div class="result-status-dot"></div><span>生成完了</span>';
+
+  } catch(err) {
+    resultBox.textContent = '';
+    showError(err.message || '予期しないエラーが発生しました。');
+    document.getElementById('outputPlaceholder').style.display = 'flex';
+    outputResult.classList.remove('visible');
+  } finally {
+    setLoading(false);
+  }
+}
+
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate(); });
+</script>
+</body>
+</html>
