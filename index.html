@@ -1049,7 +1049,7 @@ async function generate() {
     const txt = document.getElementById('inputText').value.trim();
     if (!txt) { showError('文書質問のテキストを入力してください。'); return; }
     body = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       stream: true,
       messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT_TEXT + txt }] }]
@@ -1057,7 +1057,7 @@ async function generate() {
   } else {
     if (!pdfBase64) { showError('PDFファイルをアップロードしてください。'); return; }
     body = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       stream: true,
       messages: [{ role: 'user', content: [
